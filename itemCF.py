@@ -47,8 +47,8 @@ def similarity(data):
                     Mij[i].setdefault(j, 0)
                     Mij[i][j] += 1
 
-    simlist = {}
-    simlist.update(simCos(Mi, Mij))
+    simlist = []
+    simlist.append(simCos(Mi, Mij))
 
     return simlist
 

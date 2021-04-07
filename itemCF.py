@@ -1,6 +1,7 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split
+import numpy as np
 from math import sqrt
+from sklearn.model_selection import train_test_split
 
 
 # construct the inverted index of user -> item
@@ -19,14 +20,66 @@ def splitData(file):
     train_set, test_set = train_test_split(data, test_size=0.2, random_state=18)
     return convertDict(train_set), convertDict(test_set)
 
-# calculate cosine similarity
+# calculate Cosine similarity
 def simCos(Mi, Mij):
     res = {}
     for i, itemlist in Mij.items():
         res.setdefault(i, {})
         for j in itemlist.keys():
             res[i].setdefault(j, 0)
-            res[i][j] = Mij[i][j] / sqrt(Mi[i] * Mi[j])
+            res[i][j] = Mij[i][j] / sqrt(Mi[i]*Mi[j])
+
+    return res
+
+# calculate Jaccard similarity
+def simJaccard(Mi, Mij):
+    res = {}
+    for i, itemlist in Mij.items():
+        res.setdefault(i, {})
+        for j in itemlist.keys():
+            res[i].setdefault(j, 0)
+            res[i][j] = Mij[i][j] / (Mi[i]+Mi[j]-Mij[i][j])
+
+    return res
+
+# calculate Euclidean distance similarity
+def simEuclid(Mij):
+    res = {}
+    for i, itemlist in Mij.items():
+        res.setdefault(i, {})
+        for j in itemlist.keys():
+            res[i].setdefault(j, 0)
+            same = []
+
+            for item in Mij[i]:
+                if item in Mij[j]:
+                    same.append(item)
+
+            if len(same) == 0:
+                res[i][j] = 0
+            else:
+                dis = sum([pow(Mij[i][item]-Mij[j][item], 2) for item in same])
+                res[i][j] = 1 / (1+sqrt(dis))
+
+    return res
+
+# calculate Pointwise Mutual Information similarity
+def simPMI(Mij):
+    res = {}
+    denominator = 0
+
+    for itemlist in Mij.values():
+        denominator += sum(itemlist.values())
+
+    for i, itemlist in Mij.items():
+        res.setdefault(i, {})
+        for j in itemlist.keys():
+            res[i].setdefault(j, 0)
+            num = (Mij[i][j]/denominator) / ((sum(Mij[i].values())/denominator)*(sum(Mij[j].values())/denominator))
+            if num != 0:
+                res[i][j] = np.log2(num)
+            else:
+                res[i][j] = 0
 
     return res
 
@@ -47,8 +100,11 @@ def similarity(data):
                     Mij[i].setdefault(j, 0)
                     Mij[i][j] += 1
 
-    simlist = []
-    simlist.append(simCos(Mi, Mij))
+    simlist = {}
+    simlist['Cosine'] = simCos(Mi, Mij)
+    simlist['Jaccard'] = simJaccard(Mi, Mij)
+    simlist['Euclidean'] = simEuclid(Mij)
+    simlist['PMI'] = simPMI(Mij)
 
     return simlist
 
@@ -57,5 +113,3 @@ if __name__ == '__main__':
     file = 'recipes.csv'
     train_set, test_set = splitData(file)
     simlist = similarity(train_set)
-    print(simlist)
-

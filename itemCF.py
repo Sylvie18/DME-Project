@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from math import sqrt
 from sklearn.model_selection import train_test_split
-
+import operator
 
 # split dataset into train and test
 def splitData(file):
@@ -109,8 +109,22 @@ def similarity(data):
 
     return simlist
 
+def recommandList(recipe, simlist, k, N=10):
+    rank = {}
+    for i, score in recipe.items():
+        for j, sim in sorted(simlist['Cosine'][i].items(), key=operator.itemgetter(1), reverse=True):
+            if j not in recipe.keys():
+                rank.setdefault(j,0)
+                rank[j] += float(score) * sim
+                
+    # print("---Recommandation---")
+    # print(sorted(rank.items(), key=operator.itemgetter(1), reverse=True)[0:N])
+    return sorted(rank.items(), key=operator.itemgetter(1), reverse=True)[0:N]
+    
+
 
 if __name__ == '__main__':
     file = 'recipes.csv'
     train_set, test_set = splitData(file)
     simlist = similarity(train_set)
+    # recomList = recommandList(a, simlist)

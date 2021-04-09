@@ -53,6 +53,17 @@ def similarity(dataset):
 
     return simCos(Mi, Mij)
 
+def recommandList(recipe, simlist, N=10):
+    rank = {}
+    for i, score in recipe.items():
+        for j, sim in sorted(simlist[i].items(), key=operator.itemgetter(1), reverse=True):
+            if j not in recipe.keys():
+                rank.setdefault(j,0)
+                rank[j] += float(score) * sim
+                
+    # print("---Recommandation---")
+    # print(sorted(rank.items(), key=operator.itemgetter(1), reverse=True)[0:N])
+    return sorted(rank.items(), key=operator.itemgetter(1), reverse=True)[0:N]
 
 if __name__ == '__main__':
     file = 'recipes.csv'
@@ -68,3 +79,5 @@ if __name__ == '__main__':
         kpca = KernelPCA(n_components=train_set.shape[1], kernel=kernel)
         kpca_train_set = pca.fit_transform(train_set.T)
         simlist[kernel] = similarity(pd.DataFrame(kpca_train_set.T))
+
+    # recomList = recommandList(recipe, simlist)

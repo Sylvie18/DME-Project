@@ -4,6 +4,12 @@ from math import sqrt
 from sklearn.model_selection import train_test_split
 
 
+# split dataset into train and test
+def splitData(file):
+    data = pd.read_csv(file)
+    train_set, test_set = train_test_split(data, test_size=0.2, random_state=18)
+    return train_set, test_set
+
 # construct the inverted index of user -> item
 def convertDict(data):
     res = {}
@@ -13,12 +19,6 @@ def convertDict(data):
         res.update(line.to_dict(orient='index'))
 
     return res
-
-# split dataset into train and test
-def splitData(file):
-    data = pd.read_csv(file)
-    train_set, test_set = train_test_split(data, test_size=0.2, random_state=18)
-    return convertDict(train_set), convertDict(test_set)
 
 # calculate Cosine similarity
 def simCos(Mi, Mij):
@@ -42,7 +42,7 @@ def simJaccard(Mi, Mij):
 
     return res
 
-# calculate Euclidean distance similarity
+# calculate Euclidean Distance similarity
 def simEuclid(Mij):
     res = {}
     for i, itemlist in Mij.items():
@@ -86,6 +86,7 @@ def simPMI(Mij):
 # calculate co-occurrence matrix of item -> item
 # calculate similarity matrix
 def similarity(data):
+    data = convertDict(data)
     Mi = {}   # number of users who like item i
     Mij = {}  # number of users who like item i and item j
 

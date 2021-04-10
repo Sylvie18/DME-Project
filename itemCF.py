@@ -4,6 +4,7 @@ from math import sqrt
 from sklearn.model_selection import train_test_split
 import operator
 import random
+import json
 
 # split dataset into train and test
 def splitData(data):
@@ -110,51 +111,87 @@ def similarity(data):
 
     return simlist
 
-def recommandList(recipes, simlist, K=None, N=10):
-    rank = {}
-    if K is not None:
-        for i, recipe in recipes.items():
-            rank.setdefault(i, {})
-            for j, score in recipe.items():
-                for k, sim in sorted(simlist['Cosine'][j].items(), key=operator.itemgetter(1), reverse=True)[0:K]:
-                    if k not in recipe.keys():
-                        rank[i].setdefault(k,0)
-                        rank[i][k] += float(score) * sim
-    else:
-        for i, recipe in recipes.items():
-            rank.setdefault(i, {})
-            for j, score in recipe.items():
-                for k, sim in sorted(simlist['Cosine'][j].items(), key=operator.itemgetter(1), reverse=True):
-                    if k not in recipe.keys():
-                        rank[i].setdefault(k,0)
-                        rank[i][k] += float(score) * sim
-            rank[i] = sorted(rank[i].items(), key=operator.itemgetter(1), reverse=True)[0:N]
-            
-    # print("---Recommandation---")
-    # print(sorted(rank.items(), key=operator.itemgetter(1), reverse=True)[0:N])
-    return rank
-    
 def make_missingIngs_set(data):
     misset = convertDict(data)
     misIngs = {}
-    
+
     random.seed(18)
-    
+
     for i, ingList in misset.items():
         misIng = random.choice(list(ingList))
-        misIngs[i] = {misIng: ingList[misIng]}
-        del(misset[i][misIng])
-    
+        misIngs[i] = misIng
+        del (misset[i][misIng])
+
     return misset, misIngs
-    
+
+def recommendList(recipes, simdict, K, N = 10):
+    rank = {}
+    topres = {}
+    allres = {}
+
+    for i, recipe in recipes.items():
+        rank.setdefault(i, {})
+        for j, score in recipe.items():
+            if j in simdict:
+                for k, sim in sorted(simdict[j].items(), key=operator.itemgetter(1), reverse=True)[0:K]:
+                    if k not in recipe.keys():
+                        rank[i].setdefault(k, 0)
+                        rank[i][k] += float(score) * sim
+
+        rank[i] = sorted(rank[i].items(), key=operator.itemgetter(1), reverse=True)
+        topres[i] = [each[0] for each in rank[i][0:N]]
+        allres[i] = [each[0] for each in rank[i]]
+
+    return topres, allres
+
+def completeRecipe(test_set, simlist):
+    misset, misIngs = make_missingIngs_set(test_set)
+    metriclist = ['Cosine', 'Jaccard', 'Euclidean', 'PMI']
+    res = {}
+
+    for K in range(10, 90, 10):
+        subres = {}
+        for metric in metriclist:
+            topres, allres = recommendList(misset, simlist[metric], K)
+            subres[metric] = eval(topres, allres, misIngs)
+        res['K='+str(K)] = subres
+
+    return res
+
+def precision(pred, true):
+    hit = 0
+    for i, label in true.items():
+        if label in pred[i]:
+            hit += 1
+
+    return round(hit/len(true)*100, 2)
+
+def meanRank(pred, true):
+    rank = 0
+    for i, label in true.items():
+        if label in pred[i]:
+            rank = rank + pred[i].index(label) + 1
+
+    return round(rank/len(true), 2)
+
+def eval(topres, allres, true):
+    metric = {'precision': precision(topres, true),
+              'meanrank': meanRank(allres, true)}
+
+    return metric
+
 
 if __name__ == '__main__':
     file = 'deletedquotes.csv'
     data = pd.read_csv(file)
+
     for index, row in data.iteritems():
         if row.sum() < 10:
             data = data.drop(index, axis=1)
+
     train_set, test_set = splitData(data)
     simlist = similarity(train_set)
-    misset, misIngs = make_missingIngs_set(test_set)
-    recomList = recommandList(misset, simlist)
+    result = completeRecipe(test_set, simlist)
+
+    with open('result.json', 'w') as f:
+        json.dump(result, f, indent=2)

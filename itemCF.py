@@ -6,8 +6,8 @@ import operator
 import random
 
 # split dataset into train and test
-def splitData(file):
-    data = pd.read_csv(file)
+def splitData(data):
+    # data = pd.read_csv(file)
     train_set, test_set = train_test_split(data, test_size=0.2, random_state=18)
     return train_set, test_set
 
@@ -110,17 +110,29 @@ def similarity(data):
 
     return simlist
 
-def recommandList(recipe, simlist, k, N=10):
+def recommandList(recipes, simlist, K=None, N=10):
     rank = {}
-    for i, score in recipe.items():
-        for j, sim in sorted(simlist['Cosine'][i].items(), key=operator.itemgetter(1), reverse=True):
-            if j not in recipe.keys():
-                rank.setdefault(j,0)
-                rank[j] += float(score) * sim
-                
+    if K is not None:
+        for i, recipe in recipes.items():
+            rank.setdefault(i, {})
+            for j, score in recipe.items():
+                for k, sim in sorted(simlist['Cosine'][j].items(), key=operator.itemgetter(1), reverse=True)[0:K]:
+                    if k not in recipe.keys():
+                        rank[i].setdefault(k,0)
+                        rank[i][k] += float(score) * sim
+    else:
+        for i, recipe in recipes.items():
+            rank.setdefault(i, {})
+            for j, score in recipe.items():
+                for k, sim in sorted(simlist['Cosine'][j].items(), key=operator.itemgetter(1), reverse=True):
+                    if k not in recipe.keys():
+                        rank[i].setdefault(k,0)
+                        rank[i][k] += float(score) * sim
+            rank[i] = sorted(rank[i].items(), key=operator.itemgetter(1), reverse=True)[0:N]
+            
     # print("---Recommandation---")
     # print(sorted(rank.items(), key=operator.itemgetter(1), reverse=True)[0:N])
-    return sorted(rank.items(), key=operator.itemgetter(1), reverse=True)[0:N]
+    return rank
     
 def make_missingIngs_set(data):
     misset = convertDict(data)
@@ -137,8 +149,12 @@ def make_missingIngs_set(data):
     
 
 if __name__ == '__main__':
-    file = 'recipes.csv'
-    train_set, test_set = splitData(file)
+    file = 'deletedquotes.csv'
+    data = pd.read_csv(file)
+    for index, row in data.iteritems():
+        if row.sum() < 10:
+            data = data.drop(index, axis=1)
+    train_set, test_set = splitData(data)
     simlist = similarity(train_set)
-    # recomList = recommandList(a, simlist)
     misset, misIngs = make_missingIngs_set(test_set)
+    recomList = recommandList(misset, simlist)

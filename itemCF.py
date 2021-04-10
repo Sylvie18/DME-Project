@@ -3,6 +3,7 @@ import numpy as np
 from math import sqrt
 from sklearn.model_selection import train_test_split
 import operator
+import random
 
 # split dataset into train and test
 def splitData(file):
@@ -121,10 +122,23 @@ def recommandList(recipe, simlist, k, N=10):
     # print(sorted(rank.items(), key=operator.itemgetter(1), reverse=True)[0:N])
     return sorted(rank.items(), key=operator.itemgetter(1), reverse=True)[0:N]
     
-
+def make_missingIngs_set(data):
+    misset = convertDict(data)
+    misIngs = {}
+    
+    random.seed(18)
+    
+    for i, ingList in misset.items():
+        misIng = random.choice(list(ingList))
+        misIngs[i] = {misIng: ingList[misIng]}
+        del(misset[i][misIng])
+    
+    return misset, misIngs
+    
 
 if __name__ == '__main__':
     file = 'recipes.csv'
     train_set, test_set = splitData(file)
     simlist = similarity(train_set)
     # recomList = recommandList(a, simlist)
+    misset, misIngs = make_missingIngs_set(test_set)

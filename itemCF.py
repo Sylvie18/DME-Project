@@ -7,9 +7,9 @@ import random
 import json
 
 # split dataset into train and test
-def splitData(data):
-    # data = pd.read_csv(file)
-    train_set, test_set = train_test_split(data, test_size=0.2, random_state=18)
+def splitData(file, state):
+    data = pd.read_csv(file)
+    train_set, test_set = train_test_split(data, test_size=0.2, random_state=state)
     return train_set, test_set
 
 # construct the inverted index of user -> item
@@ -57,9 +57,7 @@ def simEuclid(Mij):
                 if item in Mij[j]:
                     same.append(item)
 
-            if len(same) == 0:
-                res[i][j] = 0
-            else:
+            if len(same) != 0:
                 dis = sum([pow(Mij[i][item]-Mij[j][item], 2) for item in same])
                 res[i][j] = 1 / (1+sqrt(dis))
 
@@ -80,8 +78,6 @@ def simPMI(Mij):
             num = (Mij[i][j]/denominator) / ((sum(Mij[i].values())/denominator)*(sum(Mij[j].values())/denominator))
             if num != 0:
                 res[i][j] = np.log2(num)
-            else:
-                res[i][j] = 0
 
     return res
 
@@ -111,11 +107,10 @@ def similarity(data):
 
     return simlist
 
-def make_missingIngs_set(data):
+def make_missingIngs_set(data, state):
     misset = convertDict(data)
     misIngs = {}
-
-    random.seed(18)
+    random.seed(state)
 
     for i, ingList in misset.items():
         misIng = random.choice(list(ingList))
@@ -144,8 +139,8 @@ def recommendList(recipes, simdict, K, N = 10):
 
     return topres, allres
 
-def completeRecipe(test_set, simlist):
-    misset, misIngs = make_missingIngs_set(test_set)
+def completeRecipe(test_set, simlist, state):
+    misset, misIngs = make_missingIngs_set(test_set, state)
     metriclist = ['Cosine', 'Jaccard', 'Euclidean', 'PMI']
     res = {}
 
@@ -164,7 +159,7 @@ def precision(pred, true):
         if label in pred[i]:
             hit += 1
 
-    return round(hit/len(true)*100, 2)
+    return hit/len(true)
 
 def meanRank(pred, true):
     rank = 0
@@ -172,7 +167,7 @@ def meanRank(pred, true):
         if label in pred[i]:
             rank = rank + pred[i].index(label) + 1
 
-    return round(rank/len(true), 2)
+    return rank/len(true)
 
 def eval(topres, allres, true):
     metric = {'precision': precision(topres, true),
@@ -180,18 +175,39 @@ def eval(topres, allres, true):
 
     return metric
 
+def avgRes(allres):
+    metriclist = ['Cosine', 'Jaccard', 'Euclidean', 'PMI']
+    res = {}
+
+    for each in allres:
+        for K in range(10, 90, 10):
+            for metric in metriclist:
+                res.setdefault('K='+str(K), {})
+                res['K='+str(K)].setdefault(metric, {})
+                res['K='+str(K)][metric].setdefault('precision', 0)
+                res['K='+str(K)][metric].setdefault('meanrank', 0)
+
+                res['K='+str(K)][metric]['precision'] += each['K='+str(K)][metric]['precision']
+                res['K='+str(K)][metric]['meanrank'] += each['K='+str(K)][metric]['meanrank']
+
+    for K in range(10, 90, 10):
+        for metric in metriclist:
+            res['K='+str(K)][metric]['precision'] = round(res['K='+str(K)][metric]['precision']/len(allres)*100, 2)
+            res['K='+str(K)][metric]['meanrank'] = round(res['K='+str(K)][metric]['meanrank']/len(allres), 2)
+
+    return res
+
 
 if __name__ == '__main__':
-    file = 'deletedquotes.csv'
-    data = pd.read_csv(file)
+    file = 'preprocess_recipes.csv'
+    allres = []
 
-    for index, row in data.iteritems():
-        if row.sum() < 10:
-            data = data.drop(index, axis=1)
+    # 5-fold evaluation
+    for state in range(10, 60, 10):
+        train_set, test_set = splitData(file, state)
+        simlist = similarity(train_set)
+        allres.append(completeRecipe(test_set, simlist, state))
 
-    train_set, test_set = splitData(data)
-    simlist = similarity(train_set)
-    result = completeRecipe(test_set, simlist)
-
+    res = avgRes(allres)
     with open('result.json', 'w') as f:
-        json.dump(result, f, indent=2)
+        json.dump(res, f, indent=2)

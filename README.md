@@ -17,7 +17,7 @@ The experiment result is shown in table below.
 |  ----  | ----  |  ----  | ----  |  ----  | ----  |
 |L1 regularization      | -  | -  | -  | 60.142   | 60.284  |
 |L2 regularization    | 60.967  | 60.849  | **60.967**  | 60.731   | 60.967|
-|
+
 
 
 ### mean rank
@@ -25,6 +25,6 @@ The experiment result is shown in table below.
 |  ----  | ----  |  ----  | ----  |  ----  | ----  |
 |L1 regularization    | -  | -  | -  | 21.544  | 21.684|
 |L2 regularization    | 21.022  | **21.011**  | 21.021  | 21.573   | 21.022|
-| 
+
 
 ---

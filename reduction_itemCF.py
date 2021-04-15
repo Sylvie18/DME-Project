@@ -6,6 +6,9 @@ from sklearn.decomposition import KernelPCA
 import operator
 import random
 import json
+import mca
+import prince
+from sklearn import manifold
 
 # split dataset into train and test
 def splitData(file, state):
@@ -30,7 +33,7 @@ def simCos(Mi, Mij):
         res.setdefault(i, {})
         for j in itemlist.keys():
             res[i].setdefault(j, 0)
-            res[i][j] = Mij[i][j] / sqrt(Mi[i]*Mi[j])
+            res[i][j] = abs(Mij[i][j]) / sqrt(abs(Mi[i])*abs(Mi[j]))
 
     return res
 
@@ -45,12 +48,12 @@ def similarity(dataset):
         for i in itemlist.keys():
             Mi.setdefault(i, 0)
             Mij.setdefault(i, {})
-            Mi[i] += 1
+            Mi[i] += itemlist[i]
 
             for j in itemlist.keys():
                 if j != i:
                     Mij[i].setdefault(j, 0)
-                    Mij[i][j] += 1
+                    Mij[i][j] += itemlist[j]
 
     return simCos(Mi, Mij)
 
@@ -88,7 +91,7 @@ def recommendList(recipes, simdict, K, N = 10):
 
 def completeRecipe(test_set, simlist, state):
     misset, misIngs = make_missingIngs_set(test_set, state)
-    metriclist = ['PCA', 'rbf', 'cosine']
+    metriclist = ['PCA', 'MCA', 'TSNE']
     res = {}
 
     for K in range(10, 90, 10):
@@ -110,11 +113,15 @@ def precision(pred, true):
 
 def meanRank(pred, true):
     rank = 0
+    num = 0
     for i, label in true.items():
         if label in pred[i]:
             rank = rank + pred[i].index(label) + 1
+            num += 1
 
-    return rank/len(true)
+    if num != 0:
+        return rank / num
+    return 0
 
 def eval(topres, allres, true):
     metric = {'precision': precision(topres, true),
@@ -123,53 +130,56 @@ def eval(topres, allres, true):
     return metric
 
 def avgRes(allres):
-    metriclist = ['PCA', 'rbf', 'cosine']
+    metriclist = ['PCA', 'MCA', 'TSNE']
     res = {}
 
     for each in allres:
         for K in range(10, 90, 10):
+            kvalue = 'K=' + str(K)
             for metric in metriclist:
-                res.setdefault('K='+str(K), {})
-                res['K='+str(K)].setdefault(metric, {})
-                res['K='+str(K)][metric].setdefault('precision', 0)
-                res['K='+str(K)][metric].setdefault('meanrank', 0)
+                res.setdefault(kvalue, {})
+                res[kvalue].setdefault(metric, {})
+                res[kvalue][metric].setdefault('precision', 0)
+                res[kvalue][metric].setdefault('meanrank', 0)
 
-                res['K='+str(K)][metric]['precision'] += each['K='+str(K)][metric]['precision']
-                res['K='+str(K)][metric]['meanrank'] += each['K='+str(K)][metric]['meanrank']
+                res[kvalue][metric]['precision'] += each[kvalue][metric]['precision']
+                res[kvalue][metric]['meanrank'] += each[kvalue][metric]['meanrank']
 
     for K in range(10, 90, 10):
+        kvalue = 'K=' + str(K)
         for metric in metriclist:
-            res['K='+str(K)][metric]['precision'] = round(res['K='+str(K)][metric]['precision']/len(allres)*100, 2)
-            res['K='+str(K)][metric]['meanrank'] = round(res['K='+str(K)][metric]['meanrank']/len(allres), 2)
+            res[kvalue][metric]['precision'] = round(res[kvalue][metric]['precision'] / len(allres) * 100, 2)
+            res[kvalue][metric]['meanrank'] = round(res[kvalue][metric]['meanrank'] / len(allres), 2)
 
     return res
 
-def pcatrans(train_set):
-    kernels = ['rbf', 'cosine']
+def trans(train_set):
     simlist = {}
 
     pca = PCA(n_components=train_set.shape[1])
-    pca_train_set = pca.fit_transform(train_set.T)
-    simlist['PCA'] = similarity(pd.DataFrame(pca_train_set.T))
+    pca_train_set = pd.DataFrame(pca.fit_transform(train_set.T), index=train_set.T.index)
+    simlist['PCA'] = similarity(pca_train_set.T)
 
-    for kernel in kernels:
-        kpca = KernelPCA(n_components=train_set.shape[1], kernel=kernel)
-        kpca_train_set = kpca.fit_transform(train_set.T)
-        simlist[kernel] = similarity(pd.DataFrame(kpca_train_set.T))
+    mca = prince.MCA(n_components=train_set.shape[1])
+    mca_train_set = mca.fit_transform(train_set.T)
+    simlist['MCA'] = similarity(pd.DataFrame(mca_train_set.T))
+
+    tsne = manifold.TSNE(n_components=2048, method='exact')
+    tsne_train_set = pd.DataFrame(tsne.fit_transform(train_set.T), index=train_set.T.index)
+    simlist['TSNE'] = similarity(tsne_train_set.T)
 
     return simlist
-
 
 if __name__ == '__main__':
     file = 'preprocess_recipes.csv'
     allres = []
 
     # 5-fold evaluation
-    for state in range(10, 60, 10):
+    for state in range(60, 110, 10):
         train_set, test_set = splitData(file, state)
-        simlist = pcatrans(train_set)
+        simlist = trans(train_set)
         allres.append(completeRecipe(test_set, simlist, state))
 
     res = avgRes(allres)
-    with open('pca_result.json', 'w') as f:
+    with open('reduction_result.json', 'w') as f:
         json.dump(res, f, indent=2)

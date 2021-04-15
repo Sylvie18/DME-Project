@@ -163,11 +163,15 @@ def precision(pred, true):
 
 def meanRank(pred, true):
     rank = 0
+    num = 0
     for i, label in true.items():
         if label in pred[i]:
             rank = rank + pred[i].index(label) + 1
+            num += 1
 
-    return rank/len(true)
+    if num != 0:
+        return rank/num
+    return 0
 
 def eval(topres, allres, true):
     metric = {'precision': precision(topres, true),
@@ -181,19 +185,21 @@ def avgRes(allres):
 
     for each in allres:
         for K in range(10, 90, 10):
+            kvalue = 'K='+str(K)
             for metric in metriclist:
-                res.setdefault('K='+str(K), {})
-                res['K='+str(K)].setdefault(metric, {})
-                res['K='+str(K)][metric].setdefault('precision', 0)
-                res['K='+str(K)][metric].setdefault('meanrank', 0)
+                res.setdefault(kvalue, {})
+                res[kvalue].setdefault(metric, {})
+                res[kvalue][metric].setdefault('precision', 0)
+                res[kvalue][metric].setdefault('meanrank', 0)
 
-                res['K='+str(K)][metric]['precision'] += each['K='+str(K)][metric]['precision']
-                res['K='+str(K)][metric]['meanrank'] += each['K='+str(K)][metric]['meanrank']
+                res[kvalue][metric]['precision'] += each[kvalue][metric]['precision']
+                res[kvalue][metric]['meanrank'] += each[kvalue][metric]['meanrank']
 
     for K in range(10, 90, 10):
+        kvalue = 'K='+str(K)
         for metric in metriclist:
-            res['K='+str(K)][metric]['precision'] = round(res['K='+str(K)][metric]['precision']/len(allres)*100, 2)
-            res['K='+str(K)][metric]['meanrank'] = round(res['K='+str(K)][metric]['meanrank']/len(allres), 2)
+            res[kvalue][metric]['precision'] = round(res[kvalue][metric]['precision']/len(allres)*100, 2)
+            res[kvalue][metric]['meanrank'] = round(res[kvalue][metric]['meanrank']/len(allres), 2)
 
     return res
 
